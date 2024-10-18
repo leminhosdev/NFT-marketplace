@@ -1,5 +1,10 @@
 package com.leminhosdev.nft_dashboard.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.leminhosdev.nft_dashboard.dto.NftRequest;
+import com.leminhosdev.nft_dashboard.dto.NftResponseDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -9,7 +14,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import javax.swing.*;
 
 @Service
 public class BlockSpanService {
@@ -22,7 +26,7 @@ public class BlockSpanService {
 
     private static final String blockSpanUrl = "https://api.blockspan.com";
 
-    public String getInformation(){
+    public NftResponseDTO getNFTPrice(NftRequest nftRequest) throws JsonProcessingException {
 
         HttpHeaders headers = new HttpHeaders();
 
@@ -32,9 +36,28 @@ public class BlockSpanService {
         HttpEntity<String> httpEntity = new HttpEntity<String>(headers);
 
 
-        String url = blockSpanUrl + "/v1/collections/owner/0xf9A6318a605Db1839682C22F54537CBb68276c28?chain=eth-main&page_size=25";
+        StringBuilder stringBuilder = new StringBuilder();
+
+        stringBuilder.append(blockSpanUrl + "/v1/collections/contract/");
+        stringBuilder.append(nftRequest.contractAddress());
+
+        String url = stringBuilder.toString();
 
         ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, httpEntity, String.class);
-        return response.getBody();
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode rootNode = objectMapper.readTree(response.getBody());
+
+        JsonNode exchangeData =rootNode.get("exchange_data").get(1);
+        JsonNode statsNode = exchangeData.get("stats");
+
+        NftResponseDTO nftResponseDTO = new NftResponseDTO();
+
+        nftResponseDTO.setName(exchangeData.path("name").asText());
+        nftResponseDTO.setFloorPrice(statsNode.path("floor_price").asDouble());
+        nftResponseDTO.setBannerImageUrl(exchangeData.path("banner_image_url").asText());
+        nftResponseDTO.setFeaturedImageUrl(exchangeData.path("featured_image_url").asText());
+
+        return nftResponseDTO;
     }
 }
